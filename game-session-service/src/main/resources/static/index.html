@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Tic Tac Toe</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; max-width: 740px; }
+        h1 { margin-bottom: 0.5rem; }
+        .actions { display: flex; gap: 0.5rem; margin: 1rem 0; }
+        button { padding: 0.5rem 0.9rem; font-size: 0.95rem; cursor: pointer; }
+        .session-meta { margin-bottom: 0.5rem; color: #333; }
+        .status { margin: 0.6rem 0; font-weight: bold; }
+        .error { color: #b00020; min-height: 1.2rem; margin: 0.25rem 0 0.75rem; }
+        table { border-collapse: collapse; margin-top: 0.5rem; }
+        td {
+            width: 64px;
+            height: 64px;
+            border: 1px solid #333;
+            text-align: center;
+            font-size: 1.9rem;
+            font-weight: bold;
+        }
+        .history { margin-top: 1rem; }
+        .history ol { padding-left: 1.4rem; }
+        .muted { color: #666; }
+    </style>
+</head>
+<body>
+<h1>Distributed Tic Tac Toe</h1>
+<div class="muted" id="originInfo">Session Service UI</div>
+
+<div class="actions">
+    <button id="startBtn">Start New Simulation</button>
+    <button id="refreshBtn" disabled>Refresh Now</button>
+</div>
+
+<div class="session-meta" id="sessionMeta">Session: -</div>
+<div class="status" id="status">Press "Start New Simulation"</div>
+<div class="error" id="error"></div>
+
+<table id="board"></table>
+
+<div class="history">
+    <h3>Move History</h3>
+    <ol id="history"></ol>
+</div>
+
+<script>
+    const POLL_INTERVAL_MS = 500;
+
+    const startBtn = document.getElementById('startBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const originInfoEl = document.getElementById('originInfo');
+    const sessionMetaEl = document.getElementById('sessionMeta');
+    const statusEl = document.getElementById('status');
+    const errorEl = document.getElementById('error');
+    const boardEl = document.getElementById('board');
+    const historyEl = document.getElementById('history');
+
+    let currentSessionId = null;
+    let pollHandle = null;
+
+    function emptyBoard() {
+        return [[null, null, null], [null, null, null], [null, null, null]];
+    }
+
+    function setError(message) {
+        errorEl.textContent = message || '';
+    }
+
+    function setStatus(message, isError) {
+        statusEl.textContent = message;
+        statusEl.className = isError ? 'status error' : 'status';
+    }
+
+    function renderBoard(board) {
+        boardEl.innerHTML = '';
+        const safeBoard = board || emptyBoard();
+        for (let row = 0; row < 3; row++) {
+            const tr = document.createElement('tr');
+            for (let col = 0; col < 3; col++) {
+                const td = document.createElement('td');
+                td.textContent = safeBoard?.[row]?.[col] || '';
+                tr.appendChild(td);
+            }
+            boardEl.appendChild(tr);
+        }
+    }
+
+    function renderHistory(history) {
+        historyEl.innerHTML = '';
+        if (!history || history.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = 'No moves yet';
+            historyEl.appendChild(li);
+            return;
+        }
+        history.forEach((move, index) => {
+            const li = document.createElement('li');
+            li.textContent = `#${index + 1}: ${move.player} -> [${move.row}, ${move.col}] (${move.statusAfterMove})`;
+            historyEl.appendChild(li);
+        });
+    }
+
+    function applySession(session) {
+        currentSessionId = session.sessionId;
+        sessionMetaEl.textContent = `Session: ${session.sessionId} (Game: ${session.gameId})`;
+        renderBoard(session.board);
+        renderHistory(session.moveHistory || []);
+
+        const isFailed = session.simulationStatus === 'FAILED';
+        const text = `Simulation: ${session.simulationStatus} | Game: ${session.gameStatus} | Next: ${session.nextPlayer || '-'}`;
+        setStatus(text, isFailed);
+        setError(isFailed ? (session.errorMessage || 'Simulation failed') : '');
+
+        refreshBtn.disabled = false;
+
+        if (session.simulationStatus === 'FINISHED' || session.simulationStatus === 'FAILED') {
+            stopPolling();
+            startBtn.disabled = false;
+        }
+    }
+
+    async function parseApiError(response, fallback) {
+        if (response.status === 404) {
+            return `${fallback} (HTTP 404). Open UI from http://localhost:8082/ and ensure session-service is running.`;
+        }
+        try {
+            const payload = await response.json();
+            if (payload && payload.message) {
+                return `${fallback}: ${payload.message}`;
+            }
+        } catch (ignored) {
+            // Fallback to generic message when response body is not JSON.
+        }
+        return `${fallback} (HTTP ${response.status})`;
+    }
+
+    async function apiCreateSession() {
+        const response = await fetch('/sessions', {method: 'POST'});
+        if (!response.ok) {
+            throw new Error(await parseApiError(response, 'Failed to create session'));
+        }
+        return response.json();
+    }
+
+    async function apiStartSimulation(sessionId) {
+        const response = await fetch(`/sessions/${sessionId}/simulate`, {method: 'POST'});
+        if (!response.ok) {
+            throw new Error(await parseApiError(response, 'Failed to start simulation'));
+        }
+        return response.json();
+    }
+
+    async function apiGetSession(sessionId) {
+        const response = await fetch(`/sessions/${sessionId}`);
+        if (!response.ok) {
+            throw new Error(await parseApiError(response, 'Failed to load session'));
+        }
+        return response.json();
+    }
+
+    function stopPolling() {
+        if (pollHandle) {
+            clearInterval(pollHandle);
+            pollHandle = null;
+        }
+    }
+
+    function startPolling() {
+        stopPolling();
+        pollHandle = setInterval(async () => {
+            if (!currentSessionId) {
+                stopPolling();
+                return;
+            }
+            try {
+                const session = await apiGetSession(currentSessionId);
+                applySession(session);
+            } catch (error) {
+                stopPolling();
+                setStatus('Simulation status unavailable', true);
+                setError(error.message);
+                startBtn.disabled = false;
+            }
+        }, POLL_INTERVAL_MS);
+    }
+
+    async function handleStart() {
+        startBtn.disabled = true;
+        refreshBtn.disabled = true;
+        stopPolling();
+        setError('');
+        setStatus('Creating session...', false);
+        sessionMetaEl.textContent = 'Session: -';
+        renderBoard(emptyBoard());
+        renderHistory([]);
+
+        try {
+            const created = await apiCreateSession();
+            applySession(created);
+
+            setStatus('Starting simulation...', false);
+            const started = await apiStartSimulation(created.sessionId);
+            applySession(started);
+            startPolling();
+        } catch (error) {
+            setStatus('Cannot start simulation', true);
+            setError(error.message);
+            startBtn.disabled = false;
+        }
+    }
+
+    async function handleRefresh() {
+        if (!currentSessionId) {
+            return;
+        }
+        try {
+            const session = await apiGetSession(currentSessionId);
+            applySession(session);
+        } catch (error) {
+            setStatus('Cannot refresh session', true);
+            setError(error.message);
+        }
+    }
+
+    originInfoEl.textContent = `Session Service UI | Origin: ${window.location.origin || 'unknown'}`;
+    renderBoard(emptyBoard());
+    renderHistory([]);
+
+    startBtn.addEventListener('click', handleStart);
+    refreshBtn.addEventListener('click', handleRefresh);
+</script>
+</body>
+</html>
+
