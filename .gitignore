@@ -1,0 +1,65 @@
+# IntelliJ IDEA
+
+.idea/
+*.iml
+
+# Build directories
+
+target/
+out/
+build/
+
+# Maven
+
+.mvn/wrapper/maven-wrapper.jar
+
+# Logs
+
+*.log
+
+# OS files
+
+.DS_Store
+Thumbs.db
+
+# Environment files
+
+.env
+.env.*
+
+# Temporary files
+
+tmp/
+temp/
+
+# Java
+
+*.class
+*.jar
+*.war
+*.ear
+
+# Test reports
+
+surefire-reports/
+failsafe-reports/
+
+# Coverage
+
+coverage/
+jacoco.exec
+
+# VS Code
+
+.vscode/
+
+# Eclipse
+
+.project
+.classpath
+.settings/
+
+# Mac
+
+.AppleDouble
+.LSOverride

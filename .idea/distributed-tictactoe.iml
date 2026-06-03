@@ -1,24 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="JAVA_MODULE" version="4">
-  <component name="CheckStyle-IDEA-Module" serialisationVersion="2">
-    <option name="activeLocationsIds" />
-  </component>
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
-    <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/game-engine-service/src/main/java" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/game-engine-service/src/main/resources" type="java-resource" />
-    </content>
+    <content url="file://$MODULE_DIR$" />
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot-autoconfigure:3.3.5" level="project" />
-    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot:3.3.5" level="project" />
-    <orderEntry type="library" name="Maven: org.springframework:spring-context:6.1.14" level="project" />
-    <orderEntry type="library" name="Maven: org.springframework:spring-web:6.1.14" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.tomcat.embed:tomcat-embed-core:10.1.31" level="project" />
-    <orderEntry type="library" name="Maven: jakarta.validation:jakarta.validation-api:3.0.2" level="project" />
   </component>
   <component name="SonarLintModuleSettings">
-    <option name="uniqueId" value="526668c8-fe24-48d5-9b13-e39e6998af8a" />
+    <option name="uniqueId" value="93c22db8-7a81-43bc-8f7c-4919bbfa8f0d" />
   </component>
 </module>
